@@ -1,0 +1,357 @@
+<!-- wow/index.html -->
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, user-scalable=no"
+    />
+    <title>WoW VR Controller</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+      }
+      canvas {
+        width: 100%;
+        height: 100vh;
+        display: block;
+      }
+      #xr-button {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 10px 20px;
+        background: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      #xr-button:disabled {
+        background: #666;
+        cursor: not-allowed;
+      }
+      #status-panel {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+      .active-key {
+        color: #4caf50;
+      }
+      #connection-status {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+      }
+      .connected {
+        background: rgba(76, 175, 80, 0.8);
+        color: white;
+      }
+      .disconnected {
+        background: rgba(244, 67, 54, 0.8);
+        color: white;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="xr-button">Enter VR</button>
+    <div id="status-panel">
+      <h3>Active Controls:</h3>
+      <div id="movement-status"></div>
+      <div id="ability-status"></div>
+    </div>
+    <div id="connection-status" class="disconnected">Disconnected</div>
+
+    <script type="module">
+      const canvas = document.createElement("canvas");
+      document.body.appendChild(canvas);
+      const gl = canvas.getContext("webgl2", { xrCompatible: true });
+
+      // Initialize basic WebGL setup
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(
+        vertexShader,
+        `
+            attribute vec4 position;
+            void main() {
+                gl_Position = position;
+            }
+        `
+      );
+      gl.compileShader(vertexShader);
+
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(
+        fragmentShader,
+        `
+            void main() {
+                gl_FragColor = vec4(0.1, 0.1, 0.1, 1.0);
+            }
+        `
+      );
+      gl.compileShader(fragmentShader);
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+
+      // Create a simple quad to render
+      const positions = new Float32Array([
+        -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+      ]);
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+
+      let xrButton = null;
+      let xrSession = null;
+      let xrRefSpace = null;
+      let ws = null;
+
+      // Connect WebSocket
+      function connectWebSocket() {
+        ws = new WebSocket("ws://localhost:5000/ws");
+        const connStatus = document.getElementById("connection-status");
+
+        ws.onopen = () => {
+          console.log("WebSocket connected");
+          connStatus.textContent = "Connected";
+          connStatus.className = "connected";
+        };
+
+        ws.onclose = () => {
+          console.log("WebSocket disconnected");
+          connStatus.textContent = "Disconnected";
+          connStatus.className = "disconnected";
+          setTimeout(connectWebSocket, 1000);
+        };
+
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error);
+          connStatus.textContent = "Connection Error";
+          connStatus.className = "disconnected";
+        };
+      }
+
+      function updateStatusPanel(data) {
+        const movementStatus = document.getElementById("movement-status");
+        const abilityStatus = document.getElementById("ability-status");
+
+        if (!movementStatus || !abilityStatus) return;
+
+        const left = data.leftController || {};
+        const right = data.rightController || {};
+
+        movementStatus.innerHTML = `
+                <h4>Movement:</h4>
+                <div class="${
+                  Math.abs(Math.min(0, left.axes?.[1] || 0)) > 0.1
+                    ? "active-key"
+                    : ""
+                }">
+                    Forward: ${
+                      left.axes
+                        ? Math.abs(Math.min(0, left.axes[1])).toFixed(3)
+                        : "0"
+                    }
+                </div>
+                <div class="${
+                  Math.max(0, left.axes?.[1] || 0) > 0.1 ? "active-key" : ""
+                }">
+                    Back: ${
+                      left.axes ? Math.max(0, left.axes[1]).toFixed(3) : "0"
+                    }
+                </div>
+                <div class="${
+                  Math.abs(Math.min(0, left.axes?.[0] || 0)) > 0.1
+                    ? "active-key"
+                    : ""
+                }">
+                    Left: ${
+                      left.axes
+                        ? Math.abs(Math.min(0, left.axes[0])).toFixed(3)
+                        : "0"
+                    }
+                </div>
+                <div class="${
+                  Math.max(0, left.axes?.[0] || 0) > 0.1 ? "active-key" : ""
+                }">
+                    Right: ${
+                      left.axes ? Math.max(0, left.axes[0]).toFixed(3) : "0"
+                    }
+                </div>
+                <div class="${left.buttons?.Y > 0.5 ? "active-key" : ""}">
+                    Jump: ${left.buttons?.Y || "0"}
+                </div>
+                <div class="${left.buttons?.X > 0.5 ? "active-key" : ""}">
+                    Tab: ${left.buttons?.X || "0"}
+                </div>
+                <div class="${left.buttons?.grip > 0.5 ? "active-key" : ""}">
+                    4 (Grip): ${left.buttons?.grip || "0"}
+                </div>
+                <div class="${
+                  left.buttons?.thumbstick > 0.3 ? "active-key" : ""
+                }">
+    Left Thumbstick Click (Scroll In) - not coded, todo ${
+      left.buttons?.thumbstick || "0"
+    }
+</div>
+            `;
+
+        abilityStatus.innerHTML = `
+                <h4>Abilities:</h4>
+                <div class="${right.buttons?.A > 0.5 ? "active-key" : ""}">
+                    1 (A): ${right.buttons?.A || "0"}
+                </div>
+                <div class="${right.buttons?.B > 0.5 ? "active-key" : ""}">
+                    2 (B): ${right.buttons?.B || "0"}
+                </div>
+                <div class="${
+                  right.buttons?.trigger > 0.5 ? "active-key" : ""
+                }">
+                    3 (Trigger): ${right.buttons?.trigger || "0"}
+                </div>
+                <div class="${right.buttons?.grip > 0.5 ? "active-key" : ""}">
+                    4 (Grip): ${right.buttons?.grip || "0"}
+                </div>
+            `;
+      }
+
+      function processGamepad(source) {
+        const gamepad = source.gamepad;
+        if (!gamepad) return null;
+
+        const handedness = source.handedness;
+        const data = {
+          axes: [gamepad.axes[2] || 0, gamepad.axes[3] || 0],
+          buttons: {},
+        };
+
+        if (handedness === "left") {
+          data.buttons = {
+            X: gamepad.buttons[4]?.value || 0,
+            Y: gamepad.buttons[5]?.value || 0,
+            trigger: gamepad.buttons[0]?.value || 0,
+            grip: gamepad.buttons[1]?.value || 0,
+            thumbstick: gamepad.buttons[3]?.value || 0,
+          };
+        } else {
+          data.buttons = {
+            A: gamepad.buttons[4]?.value || 0,
+            B: gamepad.buttons[5]?.value || 0,
+            trigger: gamepad.buttons[0]?.value || 0,
+            grip: gamepad.buttons[1]?.value || 0,
+            thumbstick: gamepad.buttons[3]?.value || 0,
+          };
+        }
+        return data;
+      }
+
+      function initXR() {
+        xrButton = document.getElementById("xr-button");
+
+        if (navigator.xr) {
+          navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
+            xrButton.disabled = !supported;
+          });
+
+          xrButton.addEventListener("click", onRequestSession);
+        }
+      }
+
+      function onRequestSession() {
+        navigator.xr
+          .requestSession("immersive-vr", {
+            requiredFeatures: ["local-floor"],
+          })
+          .then(onSessionStarted);
+      }
+
+      function onSessionStarted(session) {
+        xrSession = session;
+        xrButton.textContent = "Exit VR";
+        xrButton.removeEventListener("click", onRequestSession);
+        xrButton.addEventListener("click", onEndSession);
+
+        session.updateRenderState({
+          baseLayer: new XRWebGLLayer(session, gl),
+        });
+
+        session.requestReferenceSpace("local-floor").then((refSpace) => {
+          xrRefSpace = refSpace;
+          connectWebSocket();
+          session.requestAnimationFrame(onXRFrame);
+        });
+      }
+
+      function onEndSession() {
+        if (ws) {
+          ws.close();
+        }
+        xrSession.end();
+      }
+
+      function onXRFrame(time, frame) {
+        const session = frame.session;
+        const layer = session.renderState.baseLayer;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, layer.framebuffer);
+        gl.viewport(0, 0, layer.framebufferWidth, layer.framebufferHeight);
+
+        // Clear and render the basic scene
+        gl.clearColor(0.1, 0.1, 0.1, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.useProgram(program);
+        const positionLocation = gl.getAttribLocation(program, "position");
+        gl.enableVertexAttribArray(positionLocation);
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          const inputData = {
+            leftController: null,
+            rightController: null,
+          };
+
+          for (let source of session.inputSources) {
+            const data = processGamepad(source);
+            if (data) {
+              if (source.handedness === "left") {
+                inputData.leftController = data;
+              } else {
+                inputData.rightController = data;
+              }
+            }
+          }
+
+          if (inputData.leftController || inputData.rightController) {
+            ws.send(JSON.stringify(inputData));
+            updateStatusPanel(inputData);
+          }
+        }
+
+        session.requestAnimationFrame(onXRFrame);
+      }
+
+      initXR();
+    </script>
+  </body>
+</html>
