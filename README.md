@@ -1,15 +1,19 @@
 Motioncraft
+
 A comprehensive VR and motion control system for World of Warcraft (or any game), combining VR controller mapping with gesture-based commands detected through a webcam.
 
 Overview
+
 This project consists of three interconnected components that work together:
 
 VR Controller Interface - Uses WebXR to map VR controller inputs to WoW actions
 Motion Detection System - Uses MediaPipe Pose to recognize physical motions via webcam
 Input Server - Translates VR and motion inputs into keyboard/mouse commands for WoW
 
-The system allows you to play World of Warcraft in VR, using controller movements for navigation and camera control, while also performing custom motions (like raising your arm) to trigger in-game abilities.
+The system allows you to play any game using controller movements for navigation and camera control, while also performing custom motions (like raising your arm) to trigger in-game abilities.
+
 Features
+
 VR Controller Interface
 
 Full mapping of Oculus/Meta Quest controllers to WoW controls
@@ -23,10 +27,10 @@ Motion Detection System
 
 Record, save, and recognize custom body motions
 Gesture analysis with advanced matching algorithms
+Joint importance editor for fine-tuning recognition
 Location-invariant tracking (works regardless of your position in the room)
 Motion-to-key mapping for triggering abilities with gestures
 Visual recording and playback tools
-Joint importance editor for fine-tuning recognition
 
 Input Server
 
@@ -34,16 +38,14 @@ WebSocket-based communication between components
 Translates VR and motion controls to keyboard/mouse inputs
 Supports keyboard shortcuts, mouse movement, and button clicks
 Auto-reconnect capabilities
-WoW window focus detection
 
 Requirements
 
 VR headset compatible with WebXR (Oculus Quest, HTC Vive, etc.)
 Webcam for motion detection
 Python 3.6+ with Flask
-Windows (for WoW input compatibility)
 Modern web browser supporting WebXR
-World of Warcraft installed
+The game you want to play lol
 
 Installation:
 
