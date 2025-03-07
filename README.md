@@ -79,7 +79,7 @@ The system allows you to play any game using controller movements for navigation
 ### Setting Up VR Controls
 
 1. Start the input server (`python wow_input_server.py`)
-2. Open the VR interface in a browser
+2. Open the VR interface in a browser (http://localhost:8080)
 3. Click "Enter VR" to start the VR session
 4. Use the left controller thumbstick for movement
 5. Use the right controller thumbstick for camera control
@@ -88,7 +88,7 @@ The system allows you to play any game using controller movements for navigation
 
 ### Recording Custom Motions
 
-1. Open the motion detection system in a browser
+1. Open the motion detection system in a browser (http://localhost:3000)
 2. Use the "Record" button or press 'R' to start recording a motion, or the "B" key on your right VR Controller
 3. Perform the motion you want to record
 4. Press "Stop", click 'S' or press the "B" key on your Controller again to save the motion
