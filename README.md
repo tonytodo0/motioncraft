@@ -2,6 +2,10 @@
 
 > A comprehensive VR and motion control system for World of Warcraft (or any game), combining VR controller mapping with gesture-based commands detected through a webcam.
 
+![image](https://github.com/user-attachments/assets/21af9412-e769-4efe-ae54-1cae89f0d908)
+
+
+
 ## Overview
 
 This project consists of three interconnected components that work together:
